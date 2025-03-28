@@ -1,0 +1,18 @@
+# Cursor Rules for veryfomoexpo React Native Project
+
+## Styling Guidelines
+- Use NativeWind for styling as much as possible
+- Avoid using StyleSheet.create() when NativeWind classes can be used instead
+- Use className prop instead of style prop when using NativeWind
+- For complex styling that can't be achieved with NativeWind, use StyleSheet as a fallback
+
+## Code Structure
+- Keep components small and focused
+- Use functional components with hooks
+- Organize related components in dedicated folders
+
+## Best Practices
+- Follow React Native best practices
+- Ensure proper TypeScript typing
+- Maintain consistent naming conventions
+- Write clear comments for complex logic

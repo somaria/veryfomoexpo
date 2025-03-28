@@ -35,6 +35,42 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Styling with NativeWind
+
+This project uses [NativeWind](https://www.nativewind.dev/) (v4) for styling, which brings the power of Tailwind CSS to React Native. NativeWind allows you to use className props instead of StyleSheet objects for a more concise and maintainable styling approach.
+
+### Usage
+
+```jsx
+// Instead of this (StyleSheet approach):
+<View style={styles.container}>
+  <Text style={styles.text}>Hello World</Text>
+</View>
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  text: {
+    fontSize: 24,
+  },
+});
+
+// Use this (NativeWind approach):
+<View className="flex-1 items-center justify-center">
+  <Text className="text-2xl">Hello World</Text>
+</View>
+```
+
+### Styling Guidelines
+
+- Use NativeWind classes for styling whenever possible
+- Only use StyleSheet.create() when you need complex styling that can't be achieved with NativeWind
+- Refer to the [Tailwind CSS documentation](https://tailwindcss.com/docs) for available utility classes
+- Custom theme extensions can be added in the tailwind.config.js file
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:
