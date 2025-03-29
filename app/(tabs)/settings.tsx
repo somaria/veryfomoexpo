@@ -202,6 +202,34 @@ export default function SettingsScreen() {
           <Text style={styles.settingValue}>1.0.0</Text>
         </View>
       </View>
+      
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>App Info</Text>
+        
+        <View style={styles.settingItem}>
+          <View style={styles.settingContent}>
+            <Ionicons name="code-outline" size={24} color="#007AFF" />
+            <Text style={styles.settingText}>Made with</Text>
+          </View>
+          <Text style={styles.settingValue}>React Native</Text>
+        </View>
+        
+        <View style={styles.settingItem}>
+          <View style={styles.settingContent}>
+            <Ionicons name="server-outline" size={24} color="#007AFF" />
+            <Text style={styles.settingText}>Backend</Text>
+          </View>
+          <Text style={styles.settingValue}>Firebase</Text>
+        </View>
+        
+        <View style={styles.settingItem}>
+          <View style={styles.settingContent}>
+            <Ionicons name="heart-outline" size={24} color="#007AFF" />
+            <Text style={styles.settingText}>Created by</Text>
+          </View>
+          <Text style={styles.settingValue}>VeryFomo Team</Text>
+        </View>
+      </View>
     </View>
   );
 }
