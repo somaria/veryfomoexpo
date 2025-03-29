@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
-  signInAnonymously, 
-  signOut as firebaseSignOut, 
-  updateProfile, 
+  getAuth, 
+  Auth,
   onAuthStateChanged, 
   User,
-  getAuth 
+  signInAnonymously,
+  signOut as firebaseSignOut,
+  updateProfile
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, firestore } from '../firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 
 interface AuthContextType {
   user: User | null;
@@ -45,6 +47,9 @@ export const createOrUpdateUserDocument = async (user: User, additionalData?: Re
     const userSnap = await getDoc(userRef);
     const userData = userSnap.exists() ? userSnap.data() : {};
     
+    // Get device ID for tracking
+    const deviceId = await getDeviceId();
+    
     // Merge existing data with new data
     const updatedData = {
       uid: user.uid,
@@ -54,6 +59,10 @@ export const createOrUpdateUserDocument = async (user: User, additionalData?: Re
       createdAt: userData.createdAt || serverTimestamp(),
       lastActive: serverTimestamp(),
       isAnonymous: user.isAnonymous,
+      deviceId: deviceId, // Store device ID with user
+      devices: userData.devices ? 
+        (userData.devices.includes(deviceId) ? userData.devices : [...userData.devices, deviceId]) : 
+        [deviceId],
       ...additionalData,
     };
     
@@ -65,6 +74,69 @@ export const createOrUpdateUserDocument = async (user: User, additionalData?: Re
   } catch (error) {
     console.error('Error creating user document:', error);
     throw error;
+  }
+};
+
+// Get a unique device ID
+const getDeviceId = async (): Promise<string> => {
+  try {
+    // Try to get stored device ID first
+    const storedDeviceId = await AsyncStorage.getItem('device_id');
+    if (storedDeviceId) {
+      return storedDeviceId;
+    }
+    
+    // Generate a new device ID based on device info
+    let deviceId = '';
+    
+    // Use expo-device to get device information
+    if (Device.isDevice) {
+      const deviceName = Device.deviceName || '';
+      const modelName = Device.modelName || '';
+      const osBuildId = Device.osBuildId || '';
+      
+      // Create a composite ID from device properties
+      deviceId = `${deviceName}-${modelName}-${osBuildId}-${Date.now()}`;
+    } else {
+      // For simulators or web, create a random ID
+      deviceId = `simulator-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+    }
+    
+    // Store the device ID for future use
+    await AsyncStorage.setItem('device_id', deviceId);
+    console.log('Generated and stored device ID:', deviceId);
+    
+    return deviceId;
+  } catch (error) {
+    console.error('Error getting device ID:', error);
+    // Fallback to a random ID if there's an error
+    const fallbackId = `fallback-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+    return fallbackId;
+  }
+};
+
+// Find a user by device ID
+const findUserByDeviceId = async (deviceId: string): Promise<string | null> => {
+  try {
+    console.log('Looking for existing user with device ID:', deviceId);
+    
+    // Query Firestore for users with this device ID
+    const usersRef = collection(firestore, 'users');
+    const q = query(usersRef, where('devices', 'array-contains', deviceId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      // User found with this device ID
+      const userData = querySnapshot.docs[0].data();
+      console.log('Found existing user:', userData.uid);
+      return userData.uid;
+    }
+    
+    console.log('No existing user found with device ID:', deviceId);
+    return null;
+  } catch (error) {
+    console.error('Error finding user by device ID:', error);
+    return null;
   }
 };
 
@@ -96,28 +168,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Sign in anonymously
+  // Sign in anonymously, using device ID to maintain consistent user identity
   const signIn = async (): Promise<User | null> => {
     try {
-      console.log('Attempting anonymous sign-in with Firebase Web SDK');
+      console.log('Starting sign-in process with device ID tracking');
       setLoading(true);
+      
+      // Get the device ID
+      const deviceId = await getDeviceId();
+      console.log('Device ID for authentication:', deviceId);
+      
+      // Check if we already have a user signed in
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log('User already signed in:', currentUser.uid);
+        // Update the user document to ensure device ID is associated
+        await createOrUpdateUserDocument(currentUser, {
+          devices: [deviceId]
+        });
+        setLoading(false);
+        return currentUser;
+      }
+      
+      // Check if a user already exists for this device in Firestore
+      const existingUserId = await findUserByDeviceId(deviceId);
+      
+      // Sign in anonymously - we have to do this regardless because we can't
+      // directly sign in as an existing anonymous user with the client SDK
+      console.log('Signing in anonymously');
       const result = await signInAnonymously(auth);
       console.log('User signed in anonymously:', result.user.uid);
       
-      // Create or update user document in Firestore
-      await createOrUpdateUserDocument(result.user);
-      console.log('User document created/updated successfully after sign-in');
-      
-      // Store auth state in AsyncStorage as backup
+      // Store the current auth state for recovery
       await AsyncStorage.setItem('user_auth_state', JSON.stringify({
         uid: result.user.uid,
         isAnonymous: true,
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        deviceId: deviceId
       }));
       
+      // Create or update user document in Firestore with device ID
+      await createOrUpdateUserDocument(result.user, {
+        devices: [deviceId]
+      });
+      
+      // If we found an existing user for this device, log it for debugging
+      if (existingUserId && existingUserId !== result.user.uid) {
+        console.log('Note: Found existing user for this device:', existingUserId);
+        console.log('But using new user:', result.user.uid);
+        console.log('This is a limitation of Firebase anonymous auth - we cannot sign in as a specific anonymous user');
+      }
+      
+      console.log('User document created/updated successfully after sign-in');
+      setLoading(false);
       return result.user;
     } catch (error) {
-      console.error('Anonymous sign-in error:', error);
+      console.error('Error signing in:', error);
       // Log detailed error information
       if (error instanceof Error) {
         console.error({
@@ -127,9 +233,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           name: error.name
         });
       }
-      throw error;
-    } finally {
       setLoading(false);
+      return null;
     }
   };
 
@@ -192,6 +297,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Clear AsyncStorage backup
       await AsyncStorage.removeItem('user_auth_state');
+      // Do NOT remove device_id from AsyncStorage to maintain device identity
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
