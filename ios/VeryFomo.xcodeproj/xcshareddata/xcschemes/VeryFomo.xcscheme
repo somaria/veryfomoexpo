@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "veryfomoexpo.app"
-               BlueprintName = "veryfomoexpo"
-               ReferencedContainer = "container:veryfomoexpo.xcodeproj">
+               BuildableName = "VeryFomo.app"
+               BlueprintName = "VeryFomo"
+               ReferencedContainer = "container:VeryFomo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "veryfomoexpoTests.xctest"
-               BlueprintName = "veryfomoexpoTests"
-               ReferencedContainer = "container:veryfomoexpo.xcodeproj">
+               BuildableName = "VeryFomoTests.xctest"
+               BlueprintName = "VeryFomoTests"
+               ReferencedContainer = "container:VeryFomo.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "veryfomoexpo.app"
-            BlueprintName = "veryfomoexpo"
-            ReferencedContainer = "container:veryfomoexpo.xcodeproj">
+            BuildableName = "VeryFomo.app"
+            BlueprintName = "VeryFomo"
+            ReferencedContainer = "container:VeryFomo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "veryfomoexpo.app"
-            BlueprintName = "veryfomoexpo"
-            ReferencedContainer = "container:veryfomoexpo.xcodeproj">
+            BuildableName = "VeryFomo.app"
+            BlueprintName = "VeryFomo"
+            ReferencedContainer = "container:VeryFomo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
