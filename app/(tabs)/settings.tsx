@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform, TextInput, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SettingsScreen() {
-  const { user, signOut, updateDisplayName } = useAuthContext();
+  const { user, signOut, updateDisplayName, updateProfilePhoto, loading } = useAuthContext();
   const router = useRouter();
   const [newUsername, setNewUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  // Redirect to login if not signed in
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
 
   const handleSignOut = async () => {
     try {
@@ -82,6 +91,56 @@ export default function SettingsScreen() {
     setNewUsername('');
   };
 
+  // Handle avatar upload
+  const handleAvatarUpload = async () => {
+    try {
+      // Request permission to access the photo library
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need permission to access your photos to set a profile picture.');
+        return;
+      }
+      
+      // Launch the image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        
+        // Upload the selected image
+        setIsUploadingPhoto(true);
+        await updateProfilePhoto(selectedImage.uri);
+        Alert.alert('Success', 'Profile picture updated successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      Alert.alert('Error', 'Failed to update profile picture. Please try again.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // If no user is signed in, don't render the settings page
+  if (!user) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -90,11 +149,30 @@ export default function SettingsScreen() {
       
       {/* User info with fallback */}
       <View style={styles.userInfo}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.displayName?.[0] || user?.uid?.[0] || 'U'}
-          </Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.avatarContainer}
+          onPress={handleAvatarUpload}
+          disabled={isUploadingPhoto}
+          activeOpacity={0.7}
+        >
+          {isUploadingPhoto ? (
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          ) : user?.photoURL ? (
+            <Image 
+              source={{ uri: user.photoURL }} 
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {user?.displayName?.[0] || user?.uid?.[0] || 'U'}
+              </Text>
+            </View>
+          )}
+          <View style={styles.avatarOverlay}>
+            <Ionicons name="camera" size={20} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
         <View style={styles.userDetails}>
           <Text style={styles.userName}>
             {user?.displayName || 'Anonymous User'}
@@ -244,6 +322,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#8E8E93',
+  },
   header: {
     paddingTop: 60,
     paddingBottom: 16,
@@ -262,20 +351,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginBottom: 20,
   },
+  avatarContainer: {
+    position: 'relative',
+    width: 70,
+    height: 70,
+    marginRight: 16,
+    borderRadius: 35,
+    overflow: 'hidden',
+  },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+  },
+  avatarImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textTransform: 'uppercase',
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userDetails: {
     flex: 1,
@@ -284,6 +395,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: '#000000',
   },
   userId: {
     fontSize: 14,

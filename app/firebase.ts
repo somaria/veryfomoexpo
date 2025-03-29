@@ -5,6 +5,7 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase.config.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -14,6 +15,7 @@ console.log('Initializing Firebase with web SDK');
 let app: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
+let storage: FirebaseStorage;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -26,6 +28,10 @@ try {
   
   // Initialize Firestore
   firestore = getFirestore(app);
+  
+  // Initialize Storage
+  storage = getStorage(app);
+  console.log('Firebase Storage initialized');
   
   // Debug auth state changes
   onAuthStateChanged(auth, (user) => {
@@ -47,13 +53,14 @@ try {
   throw error;
 }
 
-export { app, auth, firestore };
+export { app, auth, firestore, storage };
 
 // Add default export
 const firebaseServices = {
   app,
   auth,
-  firestore
+  firestore,
+  storage
 };
 
 export default firebaseServices;
