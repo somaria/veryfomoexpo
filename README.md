@@ -83,6 +83,72 @@ VeryFomo is a real-time chat application built with React Native, Expo, and Fire
    npx expo start
    ```
 
+## Build and Deployment Guide
+
+### Android Builds
+
+1. **Development Build (Local)**
+   ```bash
+   npx expo run:android
+   ```
+
+2. **Preview Build (EAS Cloud)**
+   ```bash
+   npx eas build --platform android --profile preview
+   ```
+   - This creates an internal distribution build that can be installed on test devices
+   - The build will be available for download from the EAS dashboard
+
+3. **Production Build**
+   ```bash
+   npx eas build --platform android --profile production
+   ```
+
+### iOS Builds
+
+1. **Development Build (Local)**
+   ```bash
+   npx expo run:ios
+   ```
+   - This is the recommended approach for iOS development and testing
+   - Builds and runs the app directly on the iOS simulator
+
+2. **Preview/Production Builds**
+   
+   Due to module redefinition issues with EAS cloud builds for iOS, local builds are recommended:
+   
+   ```bash
+   # Generate native iOS project
+   npx expo prebuild --platform ios --clean
+   
+   # Open in Xcode
+   open ios/VeryFomo.xcworkspace
+   
+   # Build archive in Xcode
+   # 1. Select "Any iOS Device" as the build target
+   # 2. Select Product > Archive from the menu
+   # 3. Use the Organizer window to distribute the app
+   ```
+
+### Known Build Issues
+
+- **iOS EAS Cloud Builds**: Experience module redefinition errors in the React-RCTAppDelegate target
+  - **Root Cause**: Conflicts between React Native dependencies in the cloud build environment
+  - **Solution**: Use local builds with `npx expo run:ios` instead
+
+- **Firebase SDK Conflicts**: The app uses the Firebase Web SDK for Expo Go compatibility
+  - **Important**: Do not install React Native Firebase native modules (@react-native-firebase/app, @react-native-firebase/auth) as they conflict with the Web SDK
+
+### Build Configuration
+
+- **eas.json**: Contains build profiles for EAS builds
+  - **preview**: Internal distribution for testing
+  - **ios-build**: Specialized profile for iOS with simulator support
+  - **production**: Production build configuration
+
+- **app.json**: Contains app configuration
+  - The `"newArchEnabled": false` setting is important to avoid build issues
+
 ## Testing
 
 The app includes predefined test users for both iOS and Android platforms:
@@ -118,6 +184,7 @@ The app includes predefined test users for both iOS and Android platforms:
 
 - Multiple anonymous users may be created for the same device (resolved by switching to email/password auth)
 - Firebase Web SDK limitations in native environments
+- iOS cloud builds fail with module redefinition errors (use local builds instead)
 
 ## License
 
