@@ -83,6 +83,7 @@ const getDeviceId = async (): Promise<string> => {
     // Try to get stored device ID first
     const storedDeviceId = await AsyncStorage.getItem('device_id');
     if (storedDeviceId) {
+      console.log('Using stored device ID:', storedDeviceId);
       return storedDeviceId;
     }
     
@@ -91,6 +92,7 @@ const getDeviceId = async (): Promise<string> => {
     
     // Use expo-device to get device information
     if (Device.isDevice) {
+      // Real device - use hardware identifiers
       const deviceName = Device.deviceName || '';
       const modelName = Device.modelName || '';
       const osBuildId = Device.osBuildId || '';
@@ -98,8 +100,19 @@ const getDeviceId = async (): Promise<string> => {
       // Create a composite ID from device properties
       deviceId = `${deviceName}-${modelName}-${osBuildId}-${Date.now()}`;
     } else {
-      // For simulators or web, create a random ID
-      deviceId = `simulator-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+      // For simulators, try to create a more stable ID
+      // Use a combination of available info that might be consistent
+      const modelName = Device.modelName || '';
+      const osName = Device.osName || '';
+      const osBuildId = Device.osBuildId || '';
+      
+      if (modelName && osName) {
+        // Create a more stable simulator ID
+        deviceId = `simulator-${modelName}-${osName}-${osBuildId}`;
+      } else {
+        // Fallback to random ID if we can't get consistent info
+        deviceId = `simulator-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+      }
     }
     
     // Store the device ID for future use

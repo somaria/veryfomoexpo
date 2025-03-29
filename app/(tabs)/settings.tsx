@@ -1,12 +1,15 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
-  const { user, signOut } = useAuthContext();
+  const { user, signOut, updateDisplayName } = useAuthContext();
   const router = useRouter();
+  const [newUsername, setNewUsername] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -46,6 +49,39 @@ export default function SettingsScreen() {
     router.replace('/login');
   };
 
+  // Handle username update
+  const handleUpdateUsername = async () => {
+    if (!newUsername.trim()) {
+      Alert.alert('Error', 'Username cannot be empty');
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      await updateDisplayName(newUsername.trim());
+      setIsEditing(false);
+      setNewUsername('');
+      Alert.alert('Success', 'Username updated successfully');
+    } catch (error) {
+      console.error('Error updating username:', error);
+      Alert.alert('Error', 'Failed to update username. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Start editing username
+  const startEditingUsername = () => {
+    setNewUsername(user?.displayName || '');
+    setIsEditing(true);
+  };
+
+  // Cancel editing username
+  const cancelEditingUsername = () => {
+    setIsEditing(false);
+    setNewUsername('');
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -63,6 +99,56 @@ export default function SettingsScreen() {
           </View>
         </View>
       )}
+      
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Profile</Text>
+        
+        {isEditing ? (
+          <View style={styles.editUsernameContainer}>
+            <TextInput
+              style={styles.usernameInput}
+              value={newUsername}
+              onChangeText={setNewUsername}
+              placeholder="Enter new username"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={30}
+            />
+            <View style={styles.editButtonsRow}>
+              {isUpdating ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <>
+                  <TouchableOpacity 
+                    style={[styles.editButton, styles.saveButton]} 
+                    onPress={handleUpdateUsername}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.editButton, styles.cancelButton]} 
+                    onPress={cancelEditingUsername}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={startEditingUsername}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingContent}>
+              <Ionicons name="person-outline" size={24} color="#007AFF" />
+              <Text style={styles.settingText}>Change Username</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+        )}
+      </View>
       
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
@@ -195,12 +281,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   settingText: {
-    fontSize: 17,
-    marginLeft: 12,
+    fontSize: 16,
+    marginLeft: 15,
+    color: '#333',
   },
   settingValue: {
     fontSize: 17,
     color: '#8E8E93',
+  },
+  editUsernameContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  usernameInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    marginBottom: 15,
+  },
+  editButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  editButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#F2F2F7',
+  },
+  cancelButtonText: {
+    color: '#333',
   },
   iosSignOutButton: {
     backgroundColor: '#FF3B30',
