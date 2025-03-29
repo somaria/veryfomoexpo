@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUsers } from '../services/user';
@@ -8,8 +8,16 @@ import { checkExistingChat, createChat } from '../services/chat';
 
 export default function ContactsScreen() {
   const { users, loading, error } = useUsers();
-  const { user: currentUser } = useAuthContext();
+  const { user: currentUser, loading: authLoading } = useAuthContext();
   const router = useRouter();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      console.log('User not authenticated, redirecting to login');
+      router.replace('/login');
+    }
+  }, [currentUser, authLoading, router]);
 
   // Start a chat with a user
   const startChat = async (userId: string, displayName: string) => {

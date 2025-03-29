@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, StyleSheet, Alert, Platform, Button, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -10,6 +10,14 @@ export default function ChatsScreen() {
   const { chats, loading: chatsLoading, error } = useChats();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('User not authenticated, redirecting to login');
+      router.replace('/login');
+    }
+  }, [user, authLoading, router]);
 
   // Manual refresh function to replace router.reload()
   const handleRefresh = useCallback(() => {

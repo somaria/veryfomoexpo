@@ -15,8 +15,16 @@ export default function NewChatScreen() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuthContext();
+  const { user, loading: authLoading } = useAuthContext();
   const router = useRouter();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('User not authenticated, redirecting to login');
+      router.replace('/login');
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     // Fetch all users except the current user

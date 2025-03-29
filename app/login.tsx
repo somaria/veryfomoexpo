@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from './contexts/AuthContext';
 import { getAuth } from 'firebase/auth';
@@ -10,6 +10,7 @@ export default function LoginScreen() {
   const { signIn, signInWithEmail, updateDisplayName, loading, user } = useAuthContext();
   const router = useRouter();
   const [processingLogin, setProcessingLogin] = useState(false);
+  const isIOS = Platform.OS === 'ios';
 
   // Use useEffect for navigation instead of doing it during render
   useEffect(() => {
@@ -130,34 +131,68 @@ export default function LoginScreen() {
         <Text style={styles.title}>VeryFomo</Text>
         
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Test Users</Text>
+          <Text style={styles.sectionTitle}>
+            {isIOS ? 'iPhone Test Users' : 'Android Test Users'}
+          </Text>
           <Text style={styles.sectionDescription}>
             Select a test user to sign in quickly for testing purposes
           </Text>
           
-          <TouchableOpacity
-            style={[styles.button, styles.testUserButton]}
-            onPress={() => handleTestUserLogin('user1@test.com', 'test123', 'User 1')}
-            disabled={processingLogin}
-          >
-            <Text style={styles.buttonText}>Continue as User 1</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.button, styles.testUserButton]}
-            onPress={() => handleTestUserLogin('user2@test.com', 'test123', 'User 2')}
-            disabled={processingLogin}
-          >
-            <Text style={styles.buttonText}>Continue as User 2</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.button, styles.testUserButton]}
-            onPress={() => handleTestUserLogin('user3@test.com', 'test123', 'User 3')}
-            disabled={processingLogin}
-          >
-            <Text style={styles.buttonText}>Continue as User 3</Text>
-          </TouchableOpacity>
+          {isIOS ? (
+            // iPhone test users
+            <>
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('iphoneuser1@test.com', 'test123', 'iPhone User 1')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as iPhone User 1</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('iphoneuser2@test.com', 'test123', 'iPhone User 2')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as iPhone User 2</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('iphoneuser3@test.com', 'test123', 'iPhone User 3')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as iPhone User 3</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            // Android test users
+            <>
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('androiduser1@test.com', 'test123', 'Android User 1')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as Android User 1</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('androiduser2@test.com', 'test123', 'Android User 2')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as Android User 2</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.testUserButton]}
+                onPress={() => handleTestUserLogin('androiduser3@test.com', 'test123', 'Android User 3')}
+                disabled={processingLogin}
+              >
+                <Text style={styles.buttonText}>Continue as Android User 3</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
         
         <View style={styles.divider}>

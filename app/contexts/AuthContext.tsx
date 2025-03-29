@@ -49,42 +49,41 @@ export const createOrUpdateUserDocument = async (user: User, additionalData?: Re
     
     // Check if the user document already exists
     const userSnap = await getDoc(userRef);
-    const userData = userSnap.exists() ? userSnap.data() : {};
     
-    // Get device ID for tracking
-    const deviceId = await getDeviceId();
+    // Get the current timestamp
+    const timestamp = serverTimestamp();
     
-    // Prepare data to write to Firestore
-    const data: Record<string, any> = {
-      displayName: user.displayName || userData.displayName || `User-${user.uid.substring(0, 5)}`,
-      email: user.email || userData.email || null,
-      photoURL: user.photoURL || userData.photoURL || null,
-      isAnonymous: user.isAnonymous,
-      lastActive: serverTimestamp(),
-      ...additionalData
-    };
-    
-    // If this is a new user or we're explicitly adding device info
-    if (!userSnap.exists() || additionalData?.devices) {
-      // If the user already has devices, make sure we don't duplicate them
-      if (userData.devices && Array.isArray(userData.devices)) {
-        // Only add the device ID if it's not already in the array
-        if (!userData.devices.includes(deviceId)) {
-          data.devices = [...userData.devices, deviceId];
-        } else {
-          data.devices = userData.devices;
-        }
-      } else {
-        // First device for this user
-        data.devices = [deviceId];
-      }
+    if (userSnap.exists()) {
+      console.log(`User document exists, updating: ${user.uid}`);
+      const userData = userSnap.data();
+      
+      // Update the existing document
+      await setDoc(userRef, {
+        ...userData,
+        displayName: user.displayName || userData.displayName || `User-${user.uid.substring(0, 5)}`,
+        email: user.email || userData.email || null,
+        photoURL: user.photoURL || userData.photoURL || null,
+        lastActive: timestamp,
+        ...additionalData
+      }, { merge: true });
+      
+      console.log(`Updated user document for: ${user.uid}`);
+    } else {
+      console.log(`User document does not exist, creating new: ${user.uid}`);
+      
+      // Create a new document
+      await setDoc(userRef, {
+        uid: user.uid,
+        displayName: user.displayName || `User-${user.uid.substring(0, 5)}`,
+        email: user.email || null,
+        photoURL: user.photoURL || null,
+        createdAt: timestamp,
+        lastActive: timestamp,
+        ...additionalData
+      });
+      
+      console.log(`Created new user document for: ${user.uid}`);
     }
-    
-    // Write to Firestore
-    await setDoc(userRef, data, { merge: true });
-    console.log(`User document created/updated for ${user.uid}`);
-    
-    return data;
   } catch (error) {
     console.error('Error creating/updating user document:', error);
     throw error;
@@ -92,53 +91,59 @@ export const createOrUpdateUserDocument = async (user: User, additionalData?: Re
 };
 
 // Get a unique device ID
-const getDeviceId = async (): Promise<string> => {
+export const getDeviceId = async (): Promise<string> => {
   try {
-    // Try to get stored device ID first
+    // Try to get the stored device ID first
     const storedDeviceId = await AsyncStorage.getItem('device_id');
+    
     if (storedDeviceId) {
       console.log('Using stored device ID:', storedDeviceId);
       return storedDeviceId;
     }
     
-    // If no stored ID, generate a new one
-    console.log('No stored device ID found, generating a new one');
+    // Generate a new device ID based on device information
+    let deviceInfo = '';
     
-    // Get device info
-    const deviceName = Device.deviceName || 'unknown';
-    const modelName = Device.modelName || 'unknown';
-    const osName = Device.osName || 'unknown';
-    const osBuildId = Device.osBuildId || 'unknown';
-    
-    let deviceId: string;
-    
-    if (Device.isDevice) {
-      // For real devices, create a composite ID that should be stable
-      deviceId = `${deviceName}-${modelName}-${osBuildId}`;
-      console.log('Generated device ID for real device:', deviceId);
-    } else {
-      // For simulators, try to create a more stable ID
-      // Note: Simulators may still create multiple users as their IDs can change
-      deviceId = `simulator-${modelName}-${osName}-${osBuildId}`;
-      console.log('Generated device ID for simulator:', deviceId);
+    // Get device brand
+    if (Device.brand) {
+      deviceInfo += Device.brand;
     }
+    
+    // Get device model
+    if (Device.modelName) {
+      deviceInfo += `-${Device.modelName}`;
+    }
+    
+    // Get device OS
+    if (Device.osName) {
+      deviceInfo += `-${Device.osName}`;
+    }
+    
+    // If we couldn't get any device info, use a timestamp
+    if (!deviceInfo) {
+      deviceInfo = `device-${Date.now()}`;
+    }
+    
+    // Add a random component to ensure uniqueness
+    const randomComponent = Math.random().toString(36).substring(2, 10);
+    const deviceId = `${deviceInfo}-${randomComponent}`;
     
     // Store the device ID for future use
     await AsyncStorage.setItem('device_id', deviceId);
-    console.log('Stored new device ID in AsyncStorage');
     
+    console.log('Generated and stored new device ID:', deviceId);
     return deviceId;
   } catch (error) {
     console.error('Error getting device ID:', error);
-    // Fallback to timestamp-based ID if all else fails
-    const fallbackId = `fallback-${Date.now()}`;
+    // Fallback to a timestamp-based ID
+    const fallbackId = `fallback-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
     console.log('Using fallback device ID:', fallbackId);
     return fallbackId;
   }
 };
 
 // Find a user by device ID
-const findUserByDeviceId = async (deviceId: string): Promise<string | null> => {
+export const findUserByDeviceId = async (deviceId: string): Promise<string | null> => {
   try {
     console.log(`Looking for user with device ID: ${deviceId}`);
     
@@ -148,13 +153,13 @@ const findUserByDeviceId = async (deviceId: string): Promise<string | null> => {
     const querySnapshot = await getDocs(q);
     
     if (!querySnapshot.empty) {
-      // Return the first user ID found
+      // Get the first user that matches
       const userId = querySnapshot.docs[0].id;
-      console.log(`Found existing user ${userId} for device ID ${deviceId}`);
+      console.log(`Found user with ID: ${userId} for device ID: ${deviceId}`);
       return userId;
     }
     
-    console.log(`No user found for device ID ${deviceId}`);
+    console.log(`No user found for device ID: ${deviceId}`);
     return null;
   } catch (error) {
     console.error('Error finding user by device ID:', error);
@@ -166,6 +171,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Check for stored authentication state on startup
+  useEffect(() => {
+    const checkStoredAuthState = async () => {
+      try {
+        // First check if Firebase already has a current user
+        if (auth.currentUser) {
+          console.log('Firebase already has a current user:', auth.currentUser.uid);
+          setUser(auth.currentUser);
+          setLoading(false);
+          return;
+        }
+        
+        // If no current user in Firebase, check AsyncStorage
+        const storedAuthState = await AsyncStorage.getItem('user_auth_state');
+        
+        if (storedAuthState) {
+          console.log('Found stored auth state in AsyncStorage');
+          // We found stored auth state, but we can't directly restore it
+          // We'll wait for Firebase's onAuthStateChanged to fire
+          // If it doesn't detect a user, we'll clear the stored state
+          console.log('Waiting for Firebase Auth to initialize...');
+        } else {
+          console.log('No stored auth state and no current user');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking stored auth state:', error);
+        setLoading(false);
+      }
+    };
+    
+    checkStoredAuthState();
+  }, []);
+
   useEffect(() => {
     // Subscribe to auth state changes
     console.log('Setting up auth state listener with Firebase Web SDK');
@@ -176,9 +215,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (authUser) {
         // When user signs in, update their Firestore document
         try {
-          await createOrUpdateUserDocument(authUser);
+          await createOrUpdateUserDocument(authUser, {
+            lastLogin: serverTimestamp()
+          });
+          
+          // Store auth state in AsyncStorage for backup
+          await AsyncStorage.setItem('user_auth_state', JSON.stringify({
+            uid: authUser.uid,
+            displayName: authUser.displayName,
+            email: authUser.email,
+            isAnonymous: authUser.isAnonymous,
+            lastLogin: new Date().toISOString()
+          }));
+          
+          console.log('Stored auth state in AsyncStorage');
         } catch (error) {
           console.error('Error updating user document on auth state change:', error);
+        }
+      } else {
+        // Check if we have stored auth state but Firebase doesn't recognize the user
+        const storedAuthState = await AsyncStorage.getItem('user_auth_state');
+        if (storedAuthState) {
+          console.log('Firebase reports no user, but we have stored auth state');
+          console.log('Clearing stored auth state to maintain consistency');
+          await AsyncStorage.removeItem('user_auth_state');
+          console.log('Cleared stored auth state in AsyncStorage');
         }
       }
       
@@ -264,147 +325,111 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Error signing in with email:', error);
       setLoading(false);
       throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update user display name
-  const updateDisplayName = async (name: string): Promise<void> => {
-    try {
-      console.log(`Updating display name to: ${name}`);
-      setLoading(true);
-      
-      // Get current auth instance and current user
-      const currentAuth = getAuth();
-      const currentUser = currentAuth.currentUser;
-      
-      if (!currentUser) {
-        console.error('No user is signed in when trying to update display name');
-        throw new Error('No user is signed in');
-      }
-      
-      // Update profile in Firebase Auth
-      await updateProfile(currentUser, { displayName: name });
-      console.log('Firebase Auth profile updated successfully');
-      
-      // Update user document in Firestore
-      await createOrUpdateUserDocument(currentUser, { displayName: name });
-      console.log('User document updated with new display name');
-      
-      // Update AsyncStorage backup
-      const storedUser = await AsyncStorage.getItem('user_auth_state');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        userData.displayName = name;
-        await AsyncStorage.setItem('user_auth_state', JSON.stringify(userData));
-      }
-      
-      // Force refresh the user object
-      setUser({ ...currentUser });
-    } catch (error) {
-      console.error('Error updating display name:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update user profile photo
-  const updateProfilePhoto = async (uri: string): Promise<void> => {
-    try {
-      console.log(`Updating profile photo with URI: ${uri}`);
-      setLoading(true);
-      
-      // Get current auth instance and current user
-      const currentAuth = getAuth();
-      const currentUser = currentAuth.currentUser;
-      
-      if (!currentUser) {
-        console.error('No user is signed in when trying to update profile photo');
-        throw new Error('No user is signed in');
-      }
-      
-      // Convert image URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Create a storage reference
-      const storageRef = ref(storage, `profile_photos/${currentUser.uid}`);
-      
-      // Upload the image
-      console.log('Uploading image to Firebase Storage...');
-      await uploadBytes(storageRef, blob);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(storageRef);
-      console.log('Image uploaded successfully, download URL:', downloadURL);
-      
-      // Update profile in Firebase Auth
-      await updateProfile(currentUser, { photoURL: downloadURL });
-      console.log('Firebase Auth profile updated with new photo URL');
-      
-      // Update user document in Firestore
-      await createOrUpdateUserDocument(currentUser, { photoURL: downloadURL });
-      console.log('User document updated with new photo URL');
-      
-      // Update AsyncStorage backup
-      const storedUser = await AsyncStorage.getItem('user_auth_state');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        userData.photoURL = downloadURL;
-        await AsyncStorage.setItem('user_auth_state', JSON.stringify(userData));
-      }
-      
-      // Force refresh the user object
-      setUser({ ...currentUser });
-    } catch (error) {
-      console.error('Error updating profile photo:', error);
-      throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // Sign out
   const signOut = async (): Promise<void> => {
     try {
-      console.log('Signing out user');
-      setLoading(true);
+      console.log('Signing out...');
       
+      // Update the user's last active timestamp before signing out
       if (user) {
-        // Update last active timestamp before signing out
-        const userRef = doc(firestore, 'users', user.uid);
-        await setDoc(userRef, { lastActive: serverTimestamp() }, { merge: true });
-        console.log('Updated last active timestamp before sign out');
+        try {
+          const userRef = doc(firestore, 'users', user.uid);
+          await setDoc(userRef, {
+            lastActive: serverTimestamp()
+          }, { merge: true });
+          console.log(`Updated last active timestamp for user: ${user.uid}`);
+        } catch (error) {
+          console.error('Error updating last active timestamp:', error);
+        }
       }
       
-      await firebaseSignOut(auth);
-      console.log('User signed out successfully');
-      
-      // Clear AsyncStorage backup
+      // Clear stored auth state
       await AsyncStorage.removeItem('user_auth_state');
-      // Do NOT remove device_id from AsyncStorage to maintain device identity
+      console.log('Cleared stored auth state');
+      
+      // Sign out from Firebase
+      await firebaseSignOut(auth);
+      console.log('Signed out from Firebase');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const contextValue: AuthContextType = {
-    user,
-    loading,
-    signIn,
-    signInWithEmail,
-    signOut,
-    updateDisplayName,
-    updateProfilePhoto,
+  // Update display name
+  const updateDisplayName = async (name: string): Promise<void> => {
+    try {
+      if (!user) {
+        throw new Error('No user is signed in');
+      }
+      
+      console.log(`Updating display name to: ${name}`);
+      
+      // Update the profile in Firebase Auth
+      await updateProfile(user, { displayName: name });
+      
+      // Update the user document in Firestore
+      await createOrUpdateUserDocument(user, { displayName: name });
+      
+      console.log('Display name updated successfully');
+    } catch (error) {
+      console.error('Error updating display name:', error);
+      throw error;
+    }
+  };
+
+  // Update profile photo
+  const updateProfilePhoto = async (uri: string): Promise<void> => {
+    try {
+      if (!user) {
+        throw new Error('No user is signed in');
+      }
+      
+      console.log(`Updating profile photo with URI: ${uri}`);
+      
+      // Create a reference to the storage location
+      const storageRef = ref(storage, `profile_photos/${user.uid}`);
+      
+      // Convert URI to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Upload the file
+      const snapshot = await uploadBytes(storageRef, blob);
+      console.log('Profile photo uploaded successfully');
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      console.log(`Profile photo URL: ${downloadURL}`);
+      
+      // Update the profile in Firebase Auth
+      await updateProfile(user, { photoURL: downloadURL });
+      
+      // Update the user document in Firestore
+      await createOrUpdateUserDocument(user, { photoURL: downloadURL });
+      
+      console.log('Profile photo updated successfully');
+    } catch (error) {
+      console.error('Error updating profile photo:', error);
+      throw error;
+    }
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signIn,
+        signInWithEmail,
+        signOut,
+        updateDisplayName,
+        updateProfilePhoto
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

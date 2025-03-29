@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useMessages, sendMessage } from '../services/chat';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '../firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ChatDetails {
   id: string;
@@ -18,7 +19,7 @@ export default function ChatScreen() {
   console.log('Chat screen received params:', params);
   console.log('Chat ID from params:', id);
   
-  const { user } = useAuthContext();
+  const { user, loading: authLoading } = useAuthContext();
   const { messages, loading: messagesLoading } = useMessages(id);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
@@ -27,6 +28,15 @@ export default function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('User not authenticated, redirecting to login');
+      router.replace('/login');
+    }
+  }, [user, authLoading, router]);
 
   // Fetch chat details
   useEffect(() => {
@@ -35,6 +45,12 @@ export default function ChatScreen() {
         if (!id) {
           console.error('No chat ID provided in params');
           setError('No chat ID provided');
+          setLoading(false);
+          return;
+        }
+        
+        if (!user) {
+          console.error('User not authenticated');
           setLoading(false);
           return;
         }
@@ -63,8 +79,10 @@ export default function ChatScreen() {
       }
     };
 
-    fetchChatDetails();
-  }, [id]);
+    if (user && id) {
+      fetchChatDetails();
+    }
+  }, [id, user]);
 
   // Handle sending a message
   const handleSendMessage = async () => {
@@ -135,17 +153,32 @@ export default function ChatScreen() {
     }));
   };
 
+  // Show loading indicator while authentication is in progress
+  if (authLoading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center">
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text className="mt-4 text-gray-500">Checking authentication...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Don't render anything if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
+
   if (loading || messagesLoading) {
     return (
-      <View className="flex-1 items-center justify-center">
+      <SafeAreaView className="flex-1 items-center justify-center">
         <ActivityIndicator size="large" color="#0000ff" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center p-4">
+      <SafeAreaView className="flex-1 items-center justify-center p-4">
         <Text className="text-lg text-gray-800 dark:text-white mb-4">{error}</Text>
         <TouchableOpacity
           className="bg-blue-500 px-4 py-2 rounded-lg"
@@ -153,113 +186,120 @@ export default function ChatScreen() {
         >
           <Text className="text-white font-bold">Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <View className="flex-1 bg-white dark:bg-gray-900">
-        {/* Header */}
-        <View className="p-4 border-b border-gray-200 dark:border-gray-800 flex-row items-center">
-          <TouchableOpacity 
-            className="mr-4" 
-            onPress={() => router.back()}
-          >
-            <Text className="text-blue-500">Back</Text>
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-xl font-bold text-gray-800 dark:text-white">
-              {getChatTitle()}
-            </Text>
-            {user && (
-              <Text className="text-xs text-gray-500 dark:text-gray-400">
-                Your ID: {user.uid.substring(0, 8)}...
+    <SafeAreaView className="flex-1" style={{ paddingBottom: 0 }}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View className="flex-1 bg-white dark:bg-gray-900">
+          {/* Header */}
+          <View className="p-4 border-b border-gray-200 dark:border-gray-800 flex-row items-center">
+            <TouchableOpacity 
+              className="mr-4" 
+              onPress={() => router.back()}
+            >
+              <Text className="text-blue-500">Back</Text>
+            </TouchableOpacity>
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-gray-800 dark:text-white">
+                {getChatTitle()}
               </Text>
-            )}
+              {user && (
+                <Text className="text-xs text-gray-500 dark:text-gray-400">
+                  Your ID: {user.uid.substring(0, 8)}...
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
-        
-        {/* Messages */}
-        {messages.length === 0 ? (
-          <View className="flex-1 items-center justify-center p-4">
-            <Text className="text-gray-500 dark:text-gray-400 text-center">
-              No messages yet. Start the conversation!
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            className="flex-1 p-4"
-            data={messages}
-            inverted
-            keyExtractor={(item) => item.id || `${item.createdAt}-${item.senderId}`}
-            renderItem={({ item }) => {
-              const isCurrentUser = item.senderId === user?.uid;
-              
-              return (
-                <View className={`mb-4 max-w-[80%] ${isCurrentUser ? 'self-end' : 'self-start'}`}>
-                  {!isCurrentUser && (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">
-                      {item.senderName || `User-${item.senderId.substring(0, 5)}`}
-                    </Text>
-                  )}
-                  <View 
-                    className={`p-3 rounded-lg ${
-                      isCurrentUser 
-                        ? 'bg-blue-500 rounded-tr-none' 
-                        : 'bg-gray-200 dark:bg-gray-700 rounded-tl-none'
-                    }`}
-                  >
-                    <Text 
-                      className={`${
-                        isCurrentUser ? 'text-white' : 'text-gray-800 dark:text-white'
+          
+          {/* Messages */}
+          {messages.length === 0 ? (
+            <View className="flex-1 items-center justify-center p-4">
+              <Text className="text-gray-500 dark:text-gray-400 text-center">
+                No messages yet. Start the conversation!
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              className="flex-1 p-4"
+              data={messages}
+              inverted
+              keyExtractor={(item) => item.id || `${item.createdAt}-${item.senderId}`}
+              renderItem={({ item }) => {
+                const isCurrentUser = item.senderId === user?.uid;
+                
+                return (
+                  <View className={`mb-4 max-w-[80%] ${isCurrentUser ? 'self-end' : 'self-start'}`}>
+                    {!isCurrentUser && (
+                      <Text className="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">
+                        {item.senderName || `User-${item.senderId.substring(0, 5)}`}
+                      </Text>
+                    )}
+                    <View 
+                      className={`p-3 rounded-lg ${
+                        isCurrentUser 
+                          ? 'bg-blue-500 rounded-tr-none' 
+                          : 'bg-gray-200 dark:bg-gray-700 rounded-tl-none'
                       }`}
                     >
-                      {item.text}
-                    </Text>
+                      <Text 
+                        className={`${
+                          isCurrentUser ? 'text-white' : 'text-gray-800 dark:text-white'
+                        }`}
+                      >
+                        {item.text}
+                      </Text>
+                    </View>
+                    <View className={`flex-row ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                      <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1 mx-2">
+                        {formatTime(item.createdAt)}
+                      </Text>
+                    </View>
                   </View>
-                  <View className={`flex-row ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1 mx-2">
-                      {formatTime(item.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              );
+                );
+              }}
+            />
+          )}
+          
+          {/* Message Input */}
+          <View 
+            className="p-2 border-t border-gray-200 dark:border-gray-800 flex-row items-center"
+            style={{ 
+              paddingBottom: Math.max(insets.bottom, 8) 
             }}
-          />
-        )}
-        
-        {/* Message Input */}
-        <View className="p-2 border-t border-gray-200 dark:border-gray-800 flex-row items-center">
-          <TextInput
-            className="flex-1 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-gray-800 dark:text-white mr-2"
-            placeholder="Type a message..."
-            placeholderTextColor="#9CA3AF"
-            value={messageText}
-            onChangeText={setMessageText}
-            multiline
-            autoFocus={false}
-          />
-          <TouchableOpacity
-            className={`p-3 rounded-full ${
-              !messageText.trim() || sending ? 'bg-gray-300 dark:bg-gray-700' : 'bg-blue-500'
-            }`}
-            onPress={handleSendMessage}
-            disabled={!messageText.trim() || sending}
           >
-            {sending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text className="text-white font-bold">Send</Text>
-            )}
-          </TouchableOpacity>
+            <TextInput
+              className="flex-1 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-gray-800 dark:text-white mr-2"
+              placeholder="Type a message..."
+              placeholderTextColor="#9CA3AF"
+              value={messageText}
+              onChangeText={setMessageText}
+              multiline
+              autoFocus={false}
+            />
+            <TouchableOpacity
+              className={`p-3 rounded-full ${
+                !messageText.trim() || sending ? 'bg-gray-300 dark:bg-gray-700' : 'bg-blue-500'
+              }`}
+              onPress={handleSendMessage}
+              disabled={!messageText.trim() || sending}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text className="text-white font-bold">Send</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
