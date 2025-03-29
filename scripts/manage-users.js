@@ -14,17 +14,17 @@ async function deleteAllUsers() {
   try {
     console.log('Listing all users...');
     const listUsersResult = await auth.listUsers();
-    
+
     if (listUsersResult.users.length === 0) {
       console.log('No users found to delete.');
       return;
     }
-    
+
     console.log(`Found ${listUsersResult.users.length} users to delete.`);
-    
+
     // Get all user UIDs
     const userUids = listUsersResult.users.map(user => user.uid);
-    
+
     // Delete users in batches of 10
     const batchSize = 10;
     for (let i = 0; i < userUids.length; i += batchSize) {
@@ -34,7 +34,7 @@ async function deleteAllUsers() {
         return auth.deleteUser(uid);
       }));
     }
-    
+
     console.log('All users have been deleted successfully.');
   } catch (error) {
     console.error('Error deleting users:', error);
@@ -51,7 +51,7 @@ async function createTestUsers() {
     { email: 'androiduser2@test.com', password: 'test123', displayName: 'Android User 2' },
     { email: 'androiduser3@test.com', password: 'test123', displayName: 'Android User 3' }
   ];
-  
+
   try {
     for (const user of testUsers) {
       try {
@@ -81,41 +81,41 @@ async function createTestUsers() {
 async function clearFirestoreData() {
   try {
     console.log('Clearing Firestore data...');
-    
+
     // Get all collections
     const collections = await firestore.listCollections();
-    
+
     if (collections.length === 0) {
       console.log('No collections found to delete.');
       return;
     }
-    
+
     console.log(`Found ${collections.length} collections to clear.`);
-    
+
     // For each collection, delete all documents
     for (const collection of collections) {
       const collectionName = collection.id;
       console.log(`Clearing collection: ${collectionName}`);
-      
+
       // Get all documents in the collection
       const documents = await collection.get();
-      
+
       if (documents.empty) {
         console.log(`Collection ${collectionName} is already empty.`);
         continue;
       }
-      
+
       console.log(`Found ${documents.size} documents to delete in ${collectionName}.`);
-      
+
       // Delete documents in batches
       const batchSize = 500; // Firestore batch limit is 500
       let batch = firestore.batch();
       let count = 0;
-      
+
       for (const doc of documents.docs) {
         batch.delete(doc.ref);
         count++;
-        
+
         // If we've reached the batch limit, commit and start a new batch
         if (count >= batchSize) {
           await batch.commit();
@@ -124,16 +124,16 @@ async function clearFirestoreData() {
           count = 0;
         }
       }
-      
+
       // Commit any remaining documents
       if (count > 0) {
         await batch.commit();
         console.log(`Deleted remaining ${count} documents from ${collectionName}.`);
       }
-      
+
       console.log(`Collection ${collectionName} has been cleared.`);
     }
-    
+
     console.log('All Firestore data has been cleared successfully.');
   } catch (error) {
     console.error('Error clearing Firestore data:', error);
@@ -145,13 +145,13 @@ async function main() {
   try {
     // Clear Firestore data
     await clearFirestoreData();
-    
+
     // Delete all existing users
     await deleteAllUsers();
-    
+
     // Create new test users
     await createTestUsers();
-    
+
     console.log('User and data management completed successfully.');
   } catch (error) {
     console.error('Error in main function:', error);
