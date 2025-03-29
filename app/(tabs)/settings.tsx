@@ -88,17 +88,22 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
       </View>
       
-      {user && (
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user.displayName?.[0] || user.uid[0]}</Text>
-          </View>
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>{user.displayName || 'Anonymous User'}</Text>
-            <Text style={styles.userId}>ID: {user.uid}</Text>
-          </View>
+      {/* User info with fallback */}
+      <View style={styles.userInfo}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {user?.displayName?.[0] || user?.uid?.[0] || 'U'}
+          </Text>
         </View>
-      )}
+        <View style={styles.userDetails}>
+          <Text style={styles.userName}>
+            {user?.displayName || 'Anonymous User'}
+          </Text>
+          <Text style={styles.userId}>
+            ID: {user?.uid || 'Not signed in'}
+          </Text>
+        </View>
+      </View>
       
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Profile</Text>
