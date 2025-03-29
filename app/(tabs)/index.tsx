@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, StyleSheet, Alert, Platform, Button } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, StyleSheet, Alert, Platform, Button, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useChats } from '../services/chat';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ChatsScreen() {
-  const { user, loading: authLoading, signOut } = useAuthContext();
+  const { user, loading: authLoading } = useAuthContext();
   const { chats, loading: chatsLoading, error } = useChats();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
@@ -19,38 +19,6 @@ export default function ChatsScreen() {
       setRefreshing(false);
     }, 1000);
   }, []);
-
-  // Handle sign out
-  const handleSignOut = async () => {
-    try {
-      Alert.alert(
-        'Sign Out',
-        'Are you sure you want to sign out?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Sign Out',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await signOut();
-                router.replace('/login');
-              } catch (error) {
-                console.error('Error signing out:', error);
-                Alert.alert('Error', 'Failed to sign out. Please try again.');
-              }
-            },
-          },
-        ],
-        { cancelable: true }
-      );
-    } catch (error) {
-      console.error('Error showing sign out alert:', error);
-    }
-  };
 
   // Navigate to chat screen
   const navigateToChat = (chatId: string) => {
@@ -113,9 +81,9 @@ export default function ChatsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white dark:bg-gray-900">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="p-4 border-b border-gray-200 dark:border-gray-800 flex-row justify-between items-center">
+      <View style={styles.header}>
         <View>
           <Text className="text-2xl font-bold text-gray-800 dark:text-white">Chats</Text>
           {user && (
@@ -124,35 +92,14 @@ export default function ChatsScreen() {
             </Text>
           )}
         </View>
-        <View className="flex-row">
-          {/* New Chat Button */}
-          <TouchableOpacity
-            style={[styles.iconButton, { marginRight: 15 }]}
-            onPress={navigateToNewChat}
-            activeOpacity={0.6}
-          >
-            <Ionicons name="add-circle-outline" size={28} color="#007AFF" />
-          </TouchableOpacity>
-          
-          {/* Sign Out Button - Different implementation for iOS and Android */}
-          {Platform.OS === 'ios' ? (
-            <TouchableOpacity
-              style={[styles.signOutButton, { marginLeft: 5 }]}
-              onPress={handleSignOut}
-              activeOpacity={0.6}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleSignOut}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            >
-              <Ionicons name="log-out-outline" size={28} color="#FF3B30" />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* New Chat Button */}
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={navigateToNewChat}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="add-circle-outline" size={28} color="#007AFF" />
+        </TouchableOpacity>
       </View>
 
       {/* Chat List */}
@@ -226,14 +173,25 @@ export default function ChatsScreen() {
           <Ionicons name="add" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   iconButton: {
     padding: 10,
-    marginLeft: 8,
   },
   signOutButton: {
     backgroundColor: '#FF3B30',
