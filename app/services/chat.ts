@@ -292,3 +292,16 @@ export const useMessages = (chatId: string) => {
 
   return { messages, loading, error };
 };
+
+// Collection of chat services
+const chatServices = {
+  getCurrentUser,
+  checkExistingChat,
+  createChat,
+  sendMessage,
+  useChats,
+  useMessages
+};
+
+// Add default export
+export default chatServices;

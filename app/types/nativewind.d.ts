@@ -19,5 +19,7 @@ declare module 'react-native' {
   interface PressableProps {
     className?: string;
   }
-  // Add other components as needed
 }
+
+// Add an empty default export to satisfy Expo Router's requirements
+export default {};

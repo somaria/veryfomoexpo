@@ -149,3 +149,13 @@ export const sendTestMessage = async (
     throw error;
   }
 };
+
+// Collection of test authentication utilities
+const testAuthUtils = {
+  createTestUser,
+  createTestChat,
+  sendTestMessage
+};
+
+// Add default export to fix the warning
+export default testAuthUtils;

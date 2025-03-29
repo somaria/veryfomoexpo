@@ -128,3 +128,16 @@ export const useAuth = () => {
 
   return { user, loading };
 };
+
+// Collection of authentication services
+const authServices = {
+  signInAnonymously,
+  signOut,
+  getCurrentUser,
+  createOrUpdateUserDocument,
+  updateUserDisplayName,
+  useAuth
+};
+
+// Add default export
+export default authServices;

@@ -1,26 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from './contexts/AuthContext';
+import { getAuth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const { signIn, updateDisplayName, loading, user } = useAuthContext();
   const router = useRouter();
+  const [processingLogin, setProcessingLogin] = useState(false);
+
+  // Use useEffect for navigation instead of doing it during render
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('User already logged in, navigating to main app');
+      // Use setTimeout to avoid navigation during render cycle
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 0);
+    }
+  }, [user, loading, router]);
 
   const handleAnonymousLogin = async () => {
+    if (processingLogin) return; // Prevent multiple login attempts
+    
     try {
+      setProcessingLogin(true);
       console.log('Starting anonymous login process');
       
-      // Sign in anonymously
-      await signIn();
-      console.log('Anonymous sign-in successful');
+      // Sign in anonymously first
+      const newUser = await signIn();
+      console.log('Anonymous sign-in successful, user:', newUser?.uid);
+      
+      if (!newUser) {
+        throw new Error('Failed to sign in anonymously');
+      }
+      
+      // Wait to ensure Firebase Auth has fully processed the sign-in
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Verify user is still signed in
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        console.error('User not available after waiting period');
+        throw new Error('Authentication state not stable');
+      }
       
       // If username is provided, update the display name
       if (username.trim()) {
-        console.log(`Updating display name to: ${username.trim()}`);
-        await updateDisplayName(username.trim());
-        console.log('Display name updated successfully');
+        try {
+          console.log(`Updating display name to: ${username.trim()}`);
+          await updateDisplayName(username.trim());
+          console.log('Display name updated successfully');
+          
+          // Store username in AsyncStorage as backup
+          await AsyncStorage.setItem('user_display_name', username.trim());
+        } catch (error) {
+          console.error('Error updating display name:', error);
+          // Continue anyway since the user is logged in
+        }
       }
       
       // Navigate to the main app
@@ -32,13 +71,25 @@ export default function LoginScreen() {
         'Login Error', 
         error.message || 'Failed to sign in anonymously. Please try again.'
       );
+    } finally {
+      setProcessingLogin(false);
     }
   };
 
-  // If user is already logged in, redirect to main app
-  if (user && !loading) {
-    console.log('User already logged in, redirecting to main app');
-    router.replace('/(tabs)');
+  // If still loading, show loading indicator
+  if (loading || processingLogin) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text className="mt-4 text-gray-600">
+          {processingLogin ? 'Signing in...' : 'Loading...'}
+        </Text>
+      </View>
+    );
+  }
+
+  // Don't render the login form if already logged in
+  if (user) {
     return null;
   }
 
@@ -61,18 +112,14 @@ export default function LoginScreen() {
       <TouchableOpacity
         className="w-full bg-blue-500 p-4 rounded-lg items-center"
         onPress={handleAnonymousLogin}
-        disabled={loading}
+        disabled={loading || processingLogin}
       >
-        {loading ? (
+        {loading || processingLogin ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text className="text-white font-bold text-lg">Continue as Guest</Text>
         )}
       </TouchableOpacity>
-      
-      <Text className="mt-6 text-gray-500 dark:text-gray-400 text-center">
-        This will create an anonymous account for testing purposes.
-      </Text>
     </View>
   );
 }
